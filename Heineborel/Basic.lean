@@ -60,12 +60,15 @@ Repeat the process to get an infinite sequence T0, T1, ...
 
 Define a sequence (x_k) such that x_k is in T_k
 
+Define a sequence (S_k) such that S_k = ⋂ 0..k, T_k
+
+
 The sequence converges to some L because it's Cauchy?
 -- using the side length/diameter property
 
 L is in T_k for all k because T_k is closed?
 
-Let L ∈ U for some open set U ∈ C
+Let L ∈ U for some open set U ∈ C since C covers T0
 
 There must be some ball B that contains L and is a subset of C
 
