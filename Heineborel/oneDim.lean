@@ -15,11 +15,22 @@ theorem close_of_elem_interval (a b : ℝ) (x y : ℝ) (hx : x ∈ Icc a b) (hy 
   right
   constructor <;> linarith
 
-def HasFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) := ∀ {ι : Type u} (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) → s ⊆ ⋃ i, U i → ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, U i
+def HasFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) :=
+  ∀ (ι : Type u) (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) → s ⊆ ⋃ i, U i → ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, U i
+
+#check HasFiniteSubcover
+
+def NoFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) := 
+  ∃ (ι : Type u) (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) ∧ s ⊆ ⋃ i, U i ∧ ∀ (t : Finset ι), ¬s ⊆ ⋃ i ∈ t, U i
+
+set_option pp.explicit true in
+#check NoFiniteSubcover
+#print NoFiniteSubcover
 
 -- if all subsets of a partition have a finite subcover, their union has a finite subcover
 
 variable {α : Type*} [Fintype α]
+variable {a b : ℝ} (aleb : a ≤ b) (abnc : NoFiniteSubcover (Icc a b))
 
 theorem has_finite_subcover_of_partition (P : α → (Set ℝ))
   : (∀ i, HasFiniteSubcover (P i)) → HasFiniteSubcover (⋃ i, P i) := by
@@ -31,16 +42,16 @@ theorem has_finite_subcover_of_partition (P : α → (Set ℝ))
     apply hC'
   have subcovered : ∀ i : α, ∃ t : Finset idx, P i ⊆ ⋃ j ∈ t, C j := by
     intro i
-    apply h i C hC
+    apply h i idx C hC
     exact covered i
   have choose_finite_subcover : ∃ (t : α → Finset idx), ∀ (i : α), P i ⊆ ⋃ k ∈ t i, C k := by
     choose f hf using subcovered
     use f, hf
   rcases choose_finite_subcover with ⟨t, ht⟩
   let T := ⋃ i ∈ Fintype.elems, Finset.toSet (t i)
-  have T_finite : Set.Finite T := by 
+  have T_finite : Set.Finite T := by
     exact toFinite T
-  have : (∀ i : α, P i ⊆ ⋃ k ∈ T_finite.toFinset, C k) := by 
+  have : (∀ i : α, P i ⊆ ⋃ k ∈ T_finite.toFinset, C k) := by
     intro a
     specialize ht a
     dsimp [T]
@@ -66,62 +77,32 @@ theorem isCompact_of_has_finite_subcover (s : Set ℝ) (h : HasFiniteSubcover s)
   rw [HasFiniteSubcover] at h
   apply h
 
-variable {a b : ℝ} {aleb : a ≤ b} (abnc : ¬ HasFiniteSubcover (Icc a b))
-
-def Icc_csplit (a b : ℝ) (left : Bool) : Set ℝ := 
-  if left then Icc a ((a + b) / 2)
-          else Icc ((a + b) / 2) b
-
-theorem Icc_eq_union_csplit : Icc a b = ⋃ i, Icc_csplit a b i := by
-  simp [Icc_csplit]
-  ext x
-  constructor
-  . intro h
-    simp only [mem_iUnion, Bool.exists_bool, Bool.false_eq_true, ↓reduceIte, mem_Icc]
-    simp only [mem_Icc] at h
-    by_cases h1 : (a + b) / 2 ≤ x
-    . left
-      exact ⟨h1, h.2⟩
-    . right
-      constructor
-      exact h.1
-      linarith
-  . simp only [mem_iUnion, Bool.exists_bool, Bool.false_eq_true, ↓reduceIte, mem_Icc]
-    intro h
-    rcases h with h | h
-    . have : a ≤ x := by linarith
-      exact ⟨this, h.2⟩
-    . have : x ≤ b := by linarith
-      exact ⟨h.1, this⟩
-
--- for an interval with no finitesubcover, there exists a bool st it has no finitesubcover
-theorem exists_subinterval_bool (ha : ¬ HasFiniteSubcover (Icc a b)) 
-  : ∃ v, ¬ HasFiniteSubcover (Icc_csplit a b v) := by
-  rw [Icc_eq_union_csplit] at ha
-  apply no_finite_subcover_of_partition
-  apply ha
-
-theorem icc_sup (a b : ℝ) (h : a ≤ b): sSup (Icc a b) = b := csSup_Icc h
-theorem icc_inf (a b : ℝ) (h : a ≤ b): sInf (Icc a b) = a := csInf_Icc h
 
 -- T 0 = [a, b]
 -- T n = nth split of [a, b] such that no finite subcover exists
 
-noncomputable def V (h : ¬ HasFiniteSubcover (Icc a b)) : Bool :=
-  Classical.choose (exists_subinterval_bool h)
+theorem lemm1 (a b : ℝ) (h : NoFiniteSubcover (Icc a b)) : ∃ c d, NoFiniteSubcover (Icc c d) ∧ Icc c d ⊆ Icc a b ∧ 2 * Metric.diam (Icc c d) ≤ Metric.diam (Icc a b) := sorry
 
-noncomputable def T (h : ¬ HasFiniteSubcover (Icc a b)) : ℕ → Set ℝ
-  | 0 => Icc a b
-  | n + 1 => Icc_csplit (sSup (T h n)) (sInf (T h n)) (V h)
+noncomputable def Ts : ℕ → (r : ℝ) × (s : ℝ) ×' NoFiniteSubcover (Icc r s)
+  | 0 => ⟨a, b, abnc⟩
+  | n + 1 => by
+              have prev := lemm1 (Ts n).1 (Ts n).2.1 (Ts n).2.2
+              have pf : ∃ c d : ℝ, NoFiniteSubcover (Icc c d) := by 
+                rcases prev with ⟨c, d, h⟩
+                use c, d
+                apply h.1
+              let r := Classical.choose pf
+              let h := Classical.choose_spec pf
+              let s := Classical.choose h
+              let g := Classical.choose_spec h
+              exact ⟨r, s, g⟩
 
-theorem no_finite_subcover_in_set (n : ℕ) : ¬ HasFiniteSubcover (T abnc n) := by
-  induction' n with n ih
-  . simp [T]; assumption
-  simp [T]
-  -- split_ifs
-  sorry
+noncomputable def T (n : ℕ) : Set ℝ := let S := Ts abnc n; Icc S.1 S.2.1
 
-theorem diam_T : ∀ n, Metric.diam (T abnc n) = (1/2)^n * Metric.diam (T abnc 0) := sorry
+theorem T_ss_T (aleb : a ≤ b) (n : ℕ) : T abnc (n + 1) ⊆ T abnc n := by sorry
+
+
+theorem diam_T (n : ℕ) : Metric.diam (T abnc n) = (1/2)^n * Metric.diam (T abnc 0) := sorry
 
 theorem bad_sequence : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T abnc i := sorry
 
@@ -134,4 +115,4 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
     have h2 : ((a + b) / 2) ≤ b := by linarith
     simp [Icc_union_Icc_eq_Icc h1 h2]
 
-  sorry 
+  sorry
