@@ -183,10 +183,67 @@ theorem nested : ∀ i, T aleb abnc (i+1) ⊆ T aleb abnc i := by
   simp [Ts]
   apply (Classical.choose_spec (Ts.proof_9 aleb abnc i (Ts.proof_8 aleb abnc i))).2.2.1
 
-theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2) : ∃ L, L ∈ ⋂ i, Icc ((s i).1) ((s i).2) := by sorry
+theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2) (hnest : ∀ n, (Icc (s (n+1)).1 (s (n+1)).2) ⊆ (Icc (s n).1 (s n).2))
+  : ∃ L, L ∈ ⋂ i, Icc ((s i).1) ((s i).2) := by 
+  have hs' : ∀ n, (s (n+1)).1 ≤ (s (n+1)).2 := by
+    intro n
+    apply hs (n+1)
+
+  have hnest' : ∀ n, (s n).1 ≤ (s (n+1)).1 ∧ (s (n+1)).2 ≤ (s n).2 := by
+    intro n
+    specialize hnest n
+    specialize hs' n
+    simp [Icc_subset_Icc_iff hs'] at hnest
+    apply hnest
+
+  have hnest_left (n : ℕ) (N : ℕ) (h : n ≤ N) : (s n).1 ≤ (s N).1 := by
+    induction' N, h using Nat.le_induction with N _ ih
+    . simp
+    trans (s N).1
+    apply ih
+    apply (hnest' N).1
+      
+  have hnest_right (n : ℕ) (N : ℕ) (h : n ≤ N) : (s N).2 ≤ (s n).2 := by
+    induction' N, h using Nat.le_induction with N _ ih
+    . simp
+    trans (s N).2
+    apply (hnest' N).2
+    apply ih
+  
+  have : ∀ n, iSup (fun x ↦ (s x).1) ≤ (s n).2 := by
+    intro n
+    apply ciSup_le
+    intro k
+    by_cases c : k ≤ n
+    . trans (s n).1
+      apply hnest_left k n c
+      apply hs n
+    . have : n ≤ k := by exact Nat.le_of_not_ge c
+      trans (s k).2
+      apply hs k
+      apply hnest_right n k this
+  
+  use iSup (fun x ↦ (s x).1)
+  simp
+  intro n
+  constructor
+  . apply le_ciSup_of_le
+    simp [BddAbove, upperBounds, Nonempty]
+    use (s 0).2
+    simp
+    intro a
+    trans (s a).2
+    apply hs a
+    have : 0 ≤ a := by exact Nat.zero_le a
+    apply hnest_right 0 a this
+    use le_refl (s n).1
+  . apply this
 
 theorem has_finite_subcover_of_ss_one (s U : Set ℝ) (hU : IsOpen U) (hs : s ⊆ U)
-  : HasFiniteSubcover s := by sorry
+  : HasFiniteSubcover s := by
+  simp [HasFiniteSubcover]
+  intro idx C Copen Css
+
 
 theorem bad_limit : ∃ x, x ∈ ⋂ i, T aleb abnc i := by
   simp [T]
@@ -194,16 +251,14 @@ theorem bad_limit : ∃ x, x ∈ ⋂ i, T aleb abnc i := by
   have hs : ∀ i, (Ts aleb abnc i).low ≤ (Ts aleb abnc i).high := by
     intro i
     apply (Ts aleb abnc i).nempty
-  have := nested_closed s hs
+  have := nested_closed s hs (nested aleb abnc)
   simp at this
   exact this
 
 theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (Icc a b) := by
   apply isCompact_of_has_finite_subcover
   by_contra! ad
-  -- have : T aleb ad 0 = Icc a b := by simp [T, Ts]
-  -- have abnc : ¬ HasFiniteSubcover (T aleb ad 0) := by rwa [this]
-  -- rw [←this] at abnc
+
   choose x hx using bad_limit aleb ad
 
   simp [HasFiniteSubcover] at ad
@@ -227,14 +282,13 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
 
   have bad_T : T aleb ad n ⊆ C u := by exact fun ⦃a_1⦄ a ↦ hδ (hn a)
 
+  have no : ∀ (x : Finset idx), ¬ T aleb ad n ⊆ ⋃ i ∈ x, C i := by sorry
+
+  have T_sub : HasFiniteSubcover (T aleb ad n) := by sorry
+    
+
   -- takes infinite sets to cover T aleb ad n
   have T_no_sub : ¬ HasFiniteSubcover (T aleb ad n) := by
     apply (Ts aleb ad n).nfs
-
-  have T_sub : HasFiniteSubcover (T aleb ad n) := by
-    refine has_finite_subcover_of_ss_one (T aleb ad n) (C u) ?adsf ?hs
-    simp_rw [←Metric.isOpen_iff] at Copen
-    exact Copen u
-    exact bad_T
 
   contradiction
