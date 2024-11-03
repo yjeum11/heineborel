@@ -18,14 +18,8 @@ theorem close_of_elem_interval (a b : ℝ) (x y : ℝ) (hx : x ∈ Icc a b) (hy 
 def HasFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) :=
   ∀ (ι : Type u) (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) → s ⊆ ⋃ i, U i → ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, U i
 
-#check HasFiniteSubcover
-
-def NoFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) := 
-  ∃ (ι : Type u) (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) ∧ s ⊆ ⋃ i, U i ∧ ∀ (t : Finset ι), ¬s ⊆ ⋃ i ∈ t, U i
-
-set_option pp.explicit true in
-#check NoFiniteSubcover
-#print NoFiniteSubcover
+def NoFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) := ¬ HasFiniteSubcover s
+  -- ∃ (ι : Type u) (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) ∧ s ⊆ ⋃ i, U i ∧ ∀ (t : Finset ι), ¬s ⊆ ⋃ i ∈ t, U i
 
 -- if all subsets of a partition have a finite subcover, their union has a finite subcover
 
@@ -68,7 +62,8 @@ theorem has_finite_subcover_of_partition (P : α → (Set ℝ))
   apply this
 
 theorem no_finite_subcover_of_partition (P : α → (Set ℝ))
-  : ¬ HasFiniteSubcover (⋃ i, P i) → (∃ i, ¬ HasFiniteSubcover (P i)) := by
+  : NoFiniteSubcover (⋃ i, P i) → (∃ i, NoFiniteSubcover (P i)) := by
+  simp [NoFiniteSubcover]
   contrapose!
   apply has_finite_subcover_of_partition
 
@@ -77,42 +72,139 @@ theorem isCompact_of_has_finite_subcover (s : Set ℝ) (h : HasFiniteSubcover s)
   rw [HasFiniteSubcover] at h
   apply h
 
-
 -- T 0 = [a, b]
 -- T n = nth split of [a, b] such that no finite subcover exists
 
-theorem lemm1 (a b : ℝ) (h : NoFiniteSubcover (Icc a b)) : ∃ c d, NoFiniteSubcover (Icc c d) ∧ Icc c d ⊆ Icc a b ∧ 2 * Metric.diam (Icc c d) ≤ Metric.diam (Icc a b) := sorry
+theorem lemm1 (a b : ℝ) (aleb : a ≤ b) (h : NoFiniteSubcover (Icc a b))
+  : ∃ c d, NoFiniteSubcover (Icc c d) ∧
+    c ≤ d ∧
+    Icc c d ⊆ Icc a b ∧
+    2 * Metric.diam (Icc c d) ≤ Metric.diam (Icc a b) := by
 
-noncomputable def Ts : ℕ → (r : ℝ) × (s : ℝ) ×' NoFiniteSubcover (Icc r s)
-  | 0 => ⟨a, b, abnc⟩
+    let avg := (a + b) / 2
+    let csplit (i : Fin 2) : Set ℝ := if i == 0 then Icc a avg else Icc avg b
+
+    have a_le_avg : a ≤ avg := by dsimp [avg]; linarith
+    have avg_le_b : avg ≤ b := by dsimp [avg]; linarith
+
+    have union_csplit : ⋃ i, csplit i = Icc a b := by
+      ext x
+      constructor
+      . intro ⟨s, h1, h2⟩
+        simp only [mem_range, mem_Icc] at *
+        rcases h1 with ⟨i, hi⟩
+        simp only [Fin.isValue, beq_iff_eq, csplit] at hi
+        split_ifs at *
+        . rw [←hi] at h2
+          simp only [mem_Icc] at h2
+          rcases h2 with ⟨h2, h22⟩
+          constructor
+          exact h2
+          trans avg <;> assumption
+        . rw [←hi] at h2
+          simp only [mem_Icc] at h2
+          rcases h2 with ⟨h2, h22⟩
+          constructor
+          trans avg <;> assumption
+          exact h22
+      . intro h
+        simp only [mem_Icc] at h
+        by_cases h1: x ≤ avg
+        . use csplit 0
+          constructor
+          simp only [Fin.isValue, mem_range, exists_apply_eq_apply]
+          dsimp [csplit]
+          simp only [mem_Icc]
+          aesop
+        . use csplit 1
+          constructor
+          simp only [Fin.isValue, mem_range, exists_apply_eq_apply]
+          dsimp [csplit]
+          simp only [mem_Icc]
+          simp only [not_le] at h1
+          apply le_of_lt at h1
+          aesop
+
+    rw [←union_csplit] at h
+    apply no_finite_subcover_of_partition at h
+    rcases h with ⟨i, h⟩
+    simp [csplit] at h
+    split_ifs at * with hi
+    . use a, avg
+      constructor
+      . exact h
+      constructor
+      . linarith
+      constructor
+      . refine Icc_subset_Icc ?h.right.left.h₁ ?h.right.left.h₂ <;> linarith
+      simp [Real.diam_Icc aleb, Real.diam_Icc a_le_avg, avg]
+      linarith
+    . use avg, b
+      constructor
+      . exact h
+      constructor
+      . linarith
+      constructor
+      . apply Icc_subset_Icc <;> linarith
+      simp [Real.diam_Icc aleb, Real.diam_Icc avg_le_b, avg]
+      linarith
+
+noncomputable def Ts : ℕ → (r : ℝ) × (s : ℝ) ×' r ≤ s ×' NoFiniteSubcover (Icc r s)
+  | 0 => ⟨a, b, aleb, abnc⟩
   | n + 1 => by
-              have prev := lemm1 (Ts n).1 (Ts n).2.1 (Ts n).2.2
-              have pf : ∃ c d : ℝ, NoFiniteSubcover (Icc c d) := by 
+              have prev := lemm1 (Ts n).1 (Ts n).2.1 (Ts n).2.2.1 (Ts n).2.2.2
+              have pf : ∃ c d : ℝ, c ≤ d ∧ NoFiniteSubcover (Icc c d) := by
                 rcases prev with ⟨c, d, h⟩
                 use c, d
-                apply h.1
+                exact ⟨h.2.1, h.1⟩
               let r := Classical.choose pf
               let h := Classical.choose_spec pf
               let s := Classical.choose h
               let g := Classical.choose_spec h
-              exact ⟨r, s, g⟩
 
-noncomputable def T (n : ℕ) : Set ℝ := let S := Ts abnc n; Icc S.1 S.2.1
+              exact ⟨r, s, g.1, g.2⟩
 
-theorem T_ss_T (aleb : a ≤ b) (n : ℕ) : T abnc (n + 1) ⊆ T abnc n := by sorry
+noncomputable def T (n : ℕ) : Set ℝ := let S := Ts aleb abnc n; Icc S.1 S.2.1
+
+theorem bad_sequence : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T aleb abnc i := by
+  have : ∀ i, ∃ x, x ∈ T aleb abnc i := by
+    intro i
+    dsimp [T]
+    have := (Ts aleb abnc i).2.2.1
+    refine nonempty_def.mp ?_
+    simpa
+  choose f hf using this
+  use f
+
+set_option pp.proofs true 
+theorem nested : ∀ i, T aleb abnc (i+1) ⊆ T aleb abnc i := by
+  intro i
+  simp [T] at *
+
+  intro x hx
+  
+  simp [Ts] at hx
+  rcases hx with ⟨hx1, hx2⟩
+
+  -- let l := (Ts aleb abnc (i + 1)).1
+  -- let r := (Ts aleb abnc (i + 1)).2.1
+  -- let ller := (Ts aleb abnc (i + 1)).2.2.1
+  -- have := (Ts aleb abnc (i + 1)).2.2.2
+  -- let new : (r : ℝ) × (s : ℝ) ×' r ≤ s ×' NoFiniteSubcover (Icc r s) := ⟨c, d, cled, nccd⟩
 
 
-theorem diam_T (n : ℕ) : Metric.diam (T abnc n) = (1/2)^n * Metric.diam (T abnc 0) := sorry
+set_option pp.deepTerms true
+theorem bad_limit : ∃ x, x ∈ ⋂ i, T aleb abnc i := by
+  apply nonempty_def.mp
+  have closed : ∀ i, IsClosed (T aleb abnc i) := by
+    intro i
+    dsimp [T]
+    exact isClosed_Icc
 
-theorem bad_sequence : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T abnc i := sorry
+    
 
 theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (Icc a b) := by
   apply isCompact_of_has_finite_subcover
   by_contra! h1
-
-  have un : Icc a b = Icc a ((a + b)/2) ∪ Icc ((a + b) / 2) b := by
-    have h1 : a ≤ ((a + b) / 2) := by linarith
-    have h2 : ((a + b) / 2) ≤ b := by linarith
-    simp [Icc_union_Icc_eq_Icc h1 h2]
 
   sorry
