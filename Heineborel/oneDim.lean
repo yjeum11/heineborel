@@ -185,6 +185,9 @@ theorem nested : ∀ i, T aleb abnc (i+1) ⊆ T aleb abnc i := by
 
 theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2) : ∃ L, L ∈ ⋂ i, Icc ((s i).1) ((s i).2) := by sorry
 
+theorem has_finite_subcover_of_ss_one (s U : Set ℝ) (hU : IsOpen U) (hs : s ⊆ U)
+  : HasFiniteSubcover s := by sorry
+
 theorem bad_limit : ∃ x, x ∈ ⋂ i, T aleb abnc i := by
   simp [T]
   let s (i : ℕ) : ℝ × ℝ := ⟨(Ts aleb abnc i).low, (Ts aleb abnc i).high⟩
@@ -197,26 +200,41 @@ theorem bad_limit : ∃ x, x ∈ ⋂ i, T aleb abnc i := by
 
 theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (Icc a b) := by
   apply isCompact_of_has_finite_subcover
-  by_contra! abnc
-  have : T aleb abnc 0 = Icc a b := by simp [T, Ts]
-  rw [←this] at abnc
-  choose x hx using bad_limit aleb abnc
+  by_contra! ad
+  -- have : T aleb ad 0 = Icc a b := by simp [T, Ts]
+  -- have abnc : ¬ HasFiniteSubcover (T aleb ad 0) := by rwa [this]
+  -- rw [←this] at abnc
+  choose x hx using bad_limit aleb ad
 
-  simp [HasFiniteSubcover] at abnc
-  rcases abnc with ⟨idx, C, Copen, Ccover, Cnosub⟩
+  simp [HasFiniteSubcover] at ad
+  rcases ad with ⟨idx, C, Copen, Ccover, Cnosub⟩
   simp [Metric.isOpen_iff] at Copen
 
-  have x_mem_zero : x ∈ T aleb abnc 0 := by
-    simp only [mem_iInter] at hx
-    apply hx 0
+  simp [mem_iInter] at hx
 
   have bad_cover : ∃ i, x ∈ C i := by
-    exact mem_iUnion.mp (Ccover x_mem_zero)
+    exact mem_iUnion.mp (Ccover (hx 0))
 
   rcases bad_cover with ⟨u, hu⟩
 
   have bad_ball : ∃ δ > 0, Metric.ball x δ ⊆ C u := by 
     exact Copen u x hu
 
+  rcases bad_ball with ⟨δ, δpos, hδ⟩
 
-  sorry
+  have bad_T' : ∃ n, T aleb ad n ⊆ Metric.ball x δ := sorry
+  rcases bad_T' with ⟨n, hn⟩
+
+  have bad_T : T aleb ad n ⊆ C u := by exact fun ⦃a_1⦄ a ↦ hδ (hn a)
+
+  -- takes infinite sets to cover T aleb ad n
+  have T_no_sub : ¬ HasFiniteSubcover (T aleb ad n) := by
+    apply (Ts aleb ad n).nfs
+
+  have T_sub : HasFiniteSubcover (T aleb ad n) := by
+    refine has_finite_subcover_of_ss_one (T aleb ad n) (C u) ?adsf ?hs
+    simp_rw [←Metric.isOpen_iff] at Copen
+    exact Copen u
+    exact bad_T
+
+  contradiction
