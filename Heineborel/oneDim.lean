@@ -15,9 +15,9 @@ theorem close_of_elem_interval (a b : ℝ) (x y : ℝ) (hx : x ∈ Icc a b) (hy 
   right
   constructor <;> linarith
 
-def HasFiniteSubcover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X) := ∀ i, IsOpen (C i) → s ⊆ ⋃ i, C i →  ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, C i
+def IsOpenCover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X) : Prop := ∀ i, IsOpen (C i) ∧ s ⊆ ⋃ i, C i
 
-#check HasFiniteSubcover
+def HasFiniteSubcover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X) : Prop := ∀ i, IsOpen (C i) → s ⊆ ⋃ i, C i → ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, C i
 
 def NoFiniteSubcover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X):= ¬ HasFiniteSubcover s C
 
@@ -176,6 +176,17 @@ noncomputable def Ts (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) 
               let g := Classical.choose_spec h
               exact ⟨r, s, g.2.1, (Ts C abnc n).C, g.1⟩
 
+-- set_option pp.proofs true
+-- noncomputable def Ts (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ℕ → @ncIcc ι
+--   | 0 => ⟨a, b, aleb, C, abnc⟩
+--   | n + 1 => by
+--               have prev := lemm1 (Ts C abnc n).low (Ts C abnc n).high (Ts C abnc n).nempty (Ts C abnc n).C (Ts C abnc n).nfs
+--               let r := Classical.choose prev
+--               let h := Classical.choose_spec prev
+--               let s := Classical.choose h
+--               let g := Classical.choose_spec h
+--               exact ⟨r, s, g.2.1, (Ts C abnc n).C, g.1⟩
+
 noncomputable def T  (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) (n : ℕ) : Set ℝ := let S := Ts aleb C abnc n; Icc S.low S.high
 
 theorem bad_sequence (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T aleb C abnc i := by
@@ -250,12 +261,6 @@ theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2)
     use le_refl (s n).1
   . apply this
 
--- theorem has_finite_subcover_of_ss_one (s U : Set ℝ) (hU : IsOpen U) (hs : s ⊆ U)
---   : HasFiniteSubcover s := by
---   simp [HasFiniteSubcover]
---   intro idx C Copen Css
-
-
 theorem bad_limit (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ∃ x, x ∈ ⋂ i, T aleb C abnc i := by
   simp [T]
   let s (i : ℕ) : ℝ × ℝ := ⟨(Ts aleb C abnc i).low, (Ts aleb C abnc i).high⟩
@@ -268,9 +273,11 @@ theorem bad_limit (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : �
 
 theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (Icc a b) := by
   apply isCompact_of_has_finite_subcover
+  -- intro idx C i Copen Ccover
+
   by_contra! ad
 
-  rcases ad with ⟨idx, C, hC⟩
+  simp [HasFiniteSubcover] at ad
 
   choose x hx using bad_limit aleb C hC
   simp [HasFiniteSubcover] at hC
