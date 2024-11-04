@@ -15,29 +15,32 @@ theorem close_of_elem_interval (a b : ℝ) (x y : ℝ) (hx : x ∈ Icc a b) (hy 
   right
   constructor <;> linarith
 
-def HasFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) :=
-  ∀ (ι : Type u) (U : ι → Set X), (∀ (i : ι), IsOpen (U i)) → s ⊆ ⋃ i, U i → ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, U i
+def HasFiniteSubcover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X) := ∀ i, IsOpen (C i) → s ⊆ ⋃ i, C i →  ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, C i
 
-def NoFiniteSubcover {X : Type u} [TopologicalSpace X] (s : Set X) := ¬ HasFiniteSubcover s
+#check HasFiniteSubcover
+
+def NoFiniteSubcover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X):= ¬ HasFiniteSubcover s C
 
 -- if all subsets of a partition have a finite subcover, their union has a finite subcover
 
 variable {α : Type*} [Fintype α]
-variable {a b : ℝ} (aleb : a ≤ b) (abnc : NoFiniteSubcover (Icc a b))
+variable {ι : Type} -- [fini : Fintype ι]
+variable {a b : ℝ} (aleb : a ≤ b)
 
-theorem has_finite_subcover_of_partition (P : α → (Set ℝ))
-  : (∀ i, HasFiniteSubcover (P i)) → HasFiniteSubcover (⋃ i, P i) := by
-  intro h idx C hC hC'
+theorem has_finite_subcover_of_partition (P : α → (Set ℝ)) (C : ι → Set ℝ)
+  : (∀ i, HasFiniteSubcover (P i) C) → HasFiniteSubcover (⋃ i, P i) C := by
+  intro h j openC ssC
+  -- intro h idx C hC hC'
   dsimp [HasFiniteSubcover] at h
   have covered : ∀ i : α, P i ⊆ ⋃ j, C j := by
     intro i
-    simp only [iUnion_subset_iff] at hC'
-    apply hC'
-  have subcovered : ∀ i : α, ∃ t : Finset idx, P i ⊆ ⋃ j ∈ t, C j := by
+    simp only [iUnion_subset_iff] at ssC
+    apply ssC
+  have subcovered : ∀ i : α, ∃ t : Finset ι, P i ⊆ ⋃ j ∈ t, C j := by
     intro i
-    apply h i idx C hC
+    apply h i j openC 
     exact covered i
-  have choose_finite_subcover : ∃ (t : α → Finset idx), ∀ (i : α), P i ⊆ ⋃ k ∈ t i, C k := by
+  have choose_finite_subcover : ∃ (t : α → Finset ι), ∀ (i : α), P i ⊆ ⋃ k ∈ t i, C k := by
     choose f hf using subcovered
     use f, hf
   rcases choose_finite_subcover with ⟨t, ht⟩
@@ -60,22 +63,29 @@ theorem has_finite_subcover_of_partition (P : α → (Set ℝ))
   simp only [iUnion_subset_iff]
   apply this
 
-theorem no_finite_subcover_of_partition (P : α → (Set ℝ))
-  : NoFiniteSubcover (⋃ i, P i) → (∃ i, NoFiniteSubcover (P i)) := by
+theorem no_finite_subcover_of_partition (P : α → (Set ℝ)) (C : ι → Set ℝ)
+  : NoFiniteSubcover (⋃ i, P i) C → (∃ i, NoFiniteSubcover (P i) C) := by
   simp [NoFiniteSubcover]
   contrapose!
   apply has_finite_subcover_of_partition
 
-theorem isCompact_of_has_finite_subcover (s : Set ℝ) (h : HasFiniteSubcover s) : IsCompact s := by
+theorem isCompact_of_has_finite_subcover (s : Set ℝ)  
+  (h : ∀ (ι : Type) (C : ι → Set ℝ), HasFiniteSubcover s C) : IsCompact s := by
+  dsimp [HasFiniteSubcover] at h
   apply isCompact_of_finite_subcover
-  rw [HasFiniteSubcover] at h
-  apply h
+  intro idx U hU ssU
+  specialize h idx U
+  by_cases nem : Nonempty idx
+  . let a := nem.some
+    apply h
+    apply hU a
+    apply ssU
+  . simp at nem
+    simp at *
+    apply ssU
 
--- T 0 = [a, b]
--- T n = nth split of [a, b] such that no finite subcover exists
-
-theorem lemm1 (a b : ℝ) (aleb : a ≤ b) (h : NoFiniteSubcover (Icc a b))
-  : ∃ c d, NoFiniteSubcover (Icc c d) ∧
+theorem lemm1 (a b : ℝ) (aleb : a ≤ b) (C : ι → Set ℝ) (h : NoFiniteSubcover (Icc a b) C)
+  : ∃ c d, NoFiniteSubcover (Icc c d) C ∧
     c ≤ d ∧
     Icc c d ⊆ Icc a b ∧
     2 * Metric.diam (Icc c d) ≤ Metric.diam (Icc a b) := by
@@ -152,36 +162,37 @@ structure ncIcc where
   low : ℝ
   high : ℝ
   nempty : low ≤ high
-  nfs : NoFiniteSubcover (Icc low high)
+  C : ι → Set ℝ
+  nfs : NoFiniteSubcover (Icc low high) C
 
 set_option pp.proofs true
-noncomputable def Ts : ℕ → ncIcc
-  | 0 => ⟨a, b, aleb, abnc⟩
+noncomputable def Ts (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ℕ → @ncIcc ι
+  | 0 => ⟨a, b, aleb, C, abnc⟩
   | n + 1 => by
-              have prev := lemm1 (Ts n).low (Ts n).high (Ts n).nempty (Ts n).nfs
+              have prev := lemm1 (Ts C abnc n).low (Ts C abnc n).high (Ts C abnc n).nempty (Ts C abnc n).C (Ts C abnc n).nfs
               let r := Classical.choose prev
               let h := Classical.choose_spec prev
               let s := Classical.choose h
               let g := Classical.choose_spec h
-              exact ⟨r, s, g.2.1, g.1⟩
+              exact ⟨r, s, g.2.1, (Ts C abnc n).C, g.1⟩
 
-noncomputable def T (n : ℕ) : Set ℝ := let S := Ts aleb abnc n; Icc S.low S.high
+noncomputable def T  (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) (n : ℕ) : Set ℝ := let S := Ts aleb C abnc n; Icc S.low S.high
 
-theorem bad_sequence : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T aleb abnc i := by
-  have : ∀ i, ∃ x, x ∈ T aleb abnc i := by
+theorem bad_sequence (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T aleb C abnc i := by
+  have : ∀ i, ∃ x, x ∈ T aleb C abnc i := by
     intro i
     dsimp [T]
-    have := (Ts aleb abnc i).nempty
+    have := (Ts aleb C abnc i).nempty
     refine nonempty_def.mp ?_
     simpa
   choose f hf using this
   use f
 
-theorem nested : ∀ i, T aleb abnc (i+1) ⊆ T aleb abnc i := by
+theorem nested : ∀ i, T aleb C abnc (i+1) ⊆ T aleb C abnc i := by
   intro i
   simp [T] at *
   simp [Ts]
-  apply (Classical.choose_spec (Ts.proof_9 aleb abnc i (Ts.proof_8 aleb abnc i))).2.2.1
+  apply (Classical.choose_spec (Ts.proof_9 aleb C abnc i (Ts.proof_8 aleb C abnc i))).2.2.1
 
 theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2) (hnest : ∀ n, (Icc (s (n+1)).1 (s (n+1)).2) ⊆ (Icc (s n).1 (s n).2))
   : ∃ L, L ∈ ⋂ i, Icc ((s i).1) ((s i).2) := by 
@@ -239,19 +250,19 @@ theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2)
     use le_refl (s n).1
   . apply this
 
-theorem has_finite_subcover_of_ss_one (s U : Set ℝ) (hU : IsOpen U) (hs : s ⊆ U)
-  : HasFiniteSubcover s := by
-  simp [HasFiniteSubcover]
-  intro idx C Copen Css
+-- theorem has_finite_subcover_of_ss_one (s U : Set ℝ) (hU : IsOpen U) (hs : s ⊆ U)
+--   : HasFiniteSubcover s := by
+--   simp [HasFiniteSubcover]
+--   intro idx C Copen Css
 
 
-theorem bad_limit : ∃ x, x ∈ ⋂ i, T aleb abnc i := by
+theorem bad_limit (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ∃ x, x ∈ ⋂ i, T aleb C abnc i := by
   simp [T]
-  let s (i : ℕ) : ℝ × ℝ := ⟨(Ts aleb abnc i).low, (Ts aleb abnc i).high⟩
-  have hs : ∀ i, (Ts aleb abnc i).low ≤ (Ts aleb abnc i).high := by
+  let s (i : ℕ) : ℝ × ℝ := ⟨(Ts aleb C abnc i).low, (Ts aleb C abnc i).high⟩
+  have hs : ∀ i, (Ts aleb C abnc i).low ≤ (Ts aleb C abnc i).high := by
     intro i
-    apply (Ts aleb abnc i).nempty
-  have := nested_closed s hs (nested aleb abnc)
+    apply (Ts aleb C abnc i).nempty
+  have := nested_closed s hs (nested aleb)
   simp at this
   exact this
 
@@ -259,10 +270,11 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
   apply isCompact_of_has_finite_subcover
   by_contra! ad
 
-  choose x hx using bad_limit aleb ad
+  rcases ad with ⟨idx, C, hC⟩
 
-  simp [HasFiniteSubcover] at ad
-  rcases ad with ⟨idx, C, Copen, Ccover, Cnosub⟩
+  choose x hx using bad_limit aleb C hC
+  simp [HasFiniteSubcover] at hC
+  rcases hC with ⟨Copen, Ccover, Cnfs⟩
   simp [Metric.isOpen_iff] at Copen
 
   simp [mem_iInter] at hx
