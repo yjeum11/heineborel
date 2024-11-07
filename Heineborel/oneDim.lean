@@ -6,7 +6,7 @@ import Mathlib.Topology.Defs.Basic
 
 -- closed interval is compact
 
-open Set Metric Real
+open Set Metric Real Classical
 
 theorem close_of_elem_interval (a b : ℝ) (x y : ℝ) (hx : x ∈ Icc a b) (hy : y ∈ Icc a b)
   : dist x y ≤ dist a b := by
@@ -401,18 +401,82 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
     
   contradiction
 
--- theorem isCompact_of_ss_isCompact (F K : Set ℝ) (hs : IsClosed F) (hK : IsCompact K) (hsK : F ⊆ K) : IsCompact F := by
---   rw [←isCompact_of_has_finite_subcover]
---   rw [←isCompact_of_has_finite_subcover] at hK
---   intro idx V hV
---   
---
---
---   have hV' : IsOpenCover F (V') := sorry
---   have hVK : IsOpenCover K (V') := sorry
---   
---   rcases hK idx (V' true) hVK with ⟨t, ht⟩
---
---   -- cases on if t includes Fᶜ
---   
---   sorry
+-- set_option diagnostics true
+theorem isCompact_of_ss_isCompact (F K : Set ℝ) (hF : IsClosed F) (hK : IsCompact K) (hsK : F ⊆ K) : IsCompact F := by
+  rw [←isCompact_of_has_finite_subcover]
+  rw [←isCompact_of_has_finite_subcover] at hK
+  intro idx V hV
+
+  let V' : Option idx → Set ℝ 
+    | none => Fᶜ
+    | some i => V i
+
+  have hVK : IsOpenCover K V' := by
+    rw [IsOpenCover]
+    constructor
+    . intro i
+      cases i with
+      | none => simpa [V']
+      | some i => simp [V']; apply hV.1
+    . intro x _
+      by_cases h : x ∈ F
+      . simp
+        simp [IsOpenCover] at hV
+        rcases hV with ⟨_, hV2⟩
+        have : ∀ f ∈ F, ∃ i, f ∈ V i := by
+          intro f hf
+          exact mem_iUnion.mp (hV2 hf)
+        rcases this x h with ⟨i, hi⟩
+        use some i
+      . simp
+        use none
+        simpa [V']
+
+  rcases hK (Option idx) V' hVK with ⟨t, ht⟩
+  have hF : F ⊆ ⋃ i ∈ t, V' i := by exact fun ⦃a⦄ a_1 ↦ ht (hsK a_1)
+  -- cases on if t includes Fᶜ
+  simp [HasFiniteSubcover]
+  have inj : ∀ a a' : Option idx, ∀ b ∈ id a, b ∈ id a' → a = a' := by
+    intro a a' b hb hb'
+    simp at *
+    rw [hb, hb']
+  use Finset.filterMap id t inj
+  simp
+  simp [IsOpenCover] at *
+  intro f hf
+  specialize hF hf
+  simp at hF
+  simp
+  rcases hF with ⟨i, hi⟩
+  have : ∃ i', i = some i' := by
+    by_contra h
+    simp_rw [←Option.ne_none_iff_exists'] at h
+    simp at h
+    rw [h] at hi
+    simp [V'] at hi
+    rcases hi with ⟨_, hi2⟩
+    contradiction
+  rcases this with ⟨i', hi'⟩
+  use i'
+  constructor
+  . simp [hi', V'] at hi
+    apply hi.1
+  . simp [hi', V'] at hi
+    apply hi.2
+    
+theorem isCompact_of_closed_bounded (F : Set ℝ) (hF : IsClosed F) (hFb : Bornology.IsBounded F) : IsCompact F := by
+  rw [isBounded_iff_subset_closedBall 0] at hFb
+  simp [closedBall_eq_Icc] at hFb
+  rcases hFb with ⟨a, ha⟩
+  by_cases h : 0 ≤ a
+  . have : IsCompact (Icc (-a) a) := by apply isCompact_of_closed_interval; linarith
+    apply isCompact_of_ss_isCompact F (Icc (-a) a) <;> assumption
+  . simp at h
+    have : Icc (-a) a = ∅ := by 
+      simp [Set.eq_empty_iff_forall_not_mem]
+      intro x hx
+      linarith
+    simp [this] at ha
+    rw [ha]
+    simp
+
