@@ -8,13 +8,6 @@ import Mathlib.Topology.Defs.Basic
 
 open Set Metric Real Classical
 
-theorem close_of_elem_interval (a b : ℝ) (x y : ℝ) (hx : x ∈ Icc a b) (hy : y ∈ Icc a b)
-  : dist x y ≤ dist a b := by
-  simp only [mem_Icc] at *
-  simp only [le_abs, abs_le, neg_sub, tsub_le_iff_right, dist]
-  right
-  constructor <;> linarith
-
 def IsOpenCover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X) : Prop := (∀ i, IsOpen (C i)) ∧ s ⊆ ⋃ i, C i
 
 def HasFiniteSubcover {X ι : Type u} [TopologicalSpace X] (s : Set X) (C : ι → Set X) := ∃ t : Finset ι, s ⊆ ⋃ i ∈ t, C i
@@ -63,7 +56,7 @@ theorem no_finite_subcover_of_partition (P : α → (Set ℝ)) (C : ι → Set �
   contrapose!
   apply has_finite_subcover_of_partition
 
-theorem isCompact_of_has_finite_subcover (s : Set ℝ) :
+theorem isCompact_iff_has_finite_subcover (s : Set ℝ) :
   (∀ (ι : Type) (C : ι → Set ℝ), IsOpenCover s C → HasFiniteSubcover s C) ↔ IsCompact s := by
   constructor
   . intro h
@@ -340,7 +333,7 @@ theorem bad_limit (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : �
   exact this
 
 theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (Icc a b) := by
-  rw [←isCompact_of_has_finite_subcover]
+  rw [←isCompact_iff_has_finite_subcover]
   intro idx C oC
 
   by_contra! hC
@@ -403,8 +396,8 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
 
 -- set_option diagnostics true
 theorem isCompact_of_ss_isCompact (F K : Set ℝ) (hF : IsClosed F) (hK : IsCompact K) (hsK : F ⊆ K) : IsCompact F := by
-  rw [←isCompact_of_has_finite_subcover]
-  rw [←isCompact_of_has_finite_subcover] at hK
+  rw [←isCompact_iff_has_finite_subcover]
+  rw [←isCompact_iff_has_finite_subcover] at hK
   intro idx V hV
 
   let V' : Option idx → Set ℝ 
@@ -480,3 +473,163 @@ theorem isCompact_of_closed_bounded (F : Set ℝ) (hF : IsClosed F) (hFb : Borno
     rw [ha]
     simp
 
+theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := by
+  by_cases Nh : Kᶜ.Nonempty
+  swap
+  . simp [not_nonempty_iff_eq_empty] at Nh
+    rw [Nh]
+    exact isClosed_univ
+  rw [←isOpen_compl_iff, isOpen_iff]
+
+  intro p hp
+
+  let V (q : {x // x ∈ K}) : Set ℝ := ball p ((dist ↑q p) / 2)
+  let W (q : {x // x ∈ K}) : Set ℝ := ball ↑q ((dist ↑q p) / 2)
+
+  have ocW : IsOpenCover K W := by
+    simp [IsOpenCover]
+    constructor
+    . intro i hi; exact isOpen_ball
+    simp [W]
+    intro k hk
+    simp
+    use k
+    simp
+    constructor
+    . assumption
+    . aesop
+
+  have hfsW : HasFiniteSubcover K W := by 
+    rw [←isCompact_iff_has_finite_subcover K] at hK
+    exact hK {x // x ∈ K} W ocW
+
+  rw [HasFiniteSubcover] at hfsW
+  rcases hfsW with ⟨T, hT⟩
+
+  let V' := ⋂ q ∈ T, V q
+  let W' := ⋃ q ∈ T, W q
+
+  have VWdisj : V' ∩ W' = ∅ := by 
+    dsimp [V', W']
+    ext x
+    constructor
+    . intro hx
+      simp
+      simp [V, W] at hx
+      rcases hx with ⟨hx1, q', ⟨hq1, hq2⟩, hq3⟩
+      specialize hx1 q' hq1 hq2
+      have := calc dist q' p ≤ dist x q' + dist x p := by exact dist_triangle_left q' p x
+        _ < dist q' p := by linarith
+      linarith
+    . intro f
+      exfalso
+      simp at f
+
+  have : V' ⊆ Kᶜ := by 
+    dsimp [IsOpenCover] at ocW
+    by_contra h
+    rw [not_subset] at h
+    rcases h with ⟨x, hx1, hx2⟩
+    simp at hx2
+    have : x ∉ W' := by
+      rw [←Set.disjoint_iff_inter_eq_empty, Set.disjoint_left] at VWdisj
+      apply VWdisj at hx1
+      exact hx1
+    dsimp [W'] at VWdisj
+    apply hT at hx2
+    contradiction
+
+  have pV : p ∈ V' := by 
+    dsimp [V', V]
+    suffices : ∀ q ∈ T, p ∈ ball p (dist (↑q) p / 2)
+    . exact mem_iInter₂_of_mem this
+    intro q hq
+    simp
+    have : ↑q ∈ K := by exact Subtype.coe_prop q
+    aesop
+
+  have opV : IsOpen V' := by
+    dsimp [V']
+    apply isOpen_biInter_finset 
+    intro i _
+    simp [V]
+    exact isOpen_ball
+
+  rw [isOpen_iff] at opV
+
+  specialize opV p pV
+  rcases opV with ⟨ε, εpos, hε⟩
+  use ε, εpos
+  trans V' <;> assumption
+
+theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBounded K := by
+  rw [isBounded_iff_nndist]
+  let U (q : {x // x ∈ K}) : Set ℝ := ball q 1
+
+  have ocU : IsOpenCover K U := by
+    simp [IsOpenCover]
+    constructor
+    . intro i hi; exact isOpen_ball
+    simp [U]
+    intro k hk
+    simp
+    use k
+    simp
+    assumption
+
+  have hfsU : HasFiniteSubcover K U := by 
+    rw [←isCompact_iff_has_finite_subcover K] at hK
+    exact hK {x // x ∈ K} U ocU
+
+  rw [HasFiniteSubcover] at hfsU
+  rcases hfsU with ⟨T, hT⟩
+
+  have nT : T.Nonempty := by sorry
+
+  use (nndist ↑(T.max' nT) (↑(T.min' nT) : ℝ)) + 2
+
+  intro x hx y hy
+  have xmem : ∃ tx ∈ T, x ∈ ball ↑tx 1 := by
+    apply hT at hx
+    dsimp [U] at hx
+    simp at hx
+    rcases hx with ⟨cx, hcx1, hcx2⟩
+    simp
+    use cx, hcx1
+  have ymem : ∃ ty ∈ T, y ∈ ball ↑ty 1 := by
+    apply hT at hy
+    dsimp [U] at hy
+    simp at hy
+    rcases hy with ⟨cy, hcy1, hcy2⟩
+    simp
+    use cy, hcy1
+
+  rcases xmem with ⟨cx, hcx1, hcx2⟩
+  rcases ymem with ⟨cy, hcy1, hcy2⟩
+
+  simp at *
+  
+  have nndx : nndist x ↑cx < 1 := by exact hcx2
+  have nndy : nndist ↑cy y < 1 := by rw [nndist_comm]; apply hcy2
+
+  calc nndist x y ≤ nndist x ↑cx + nndist ↑cx y := by exact nndist_triangle x (↑cx) y
+    _ ≤ nndist x ↑cx + nndist ↑cx ↑cy + nndist ↑cy y := by 
+      rw [add_assoc, add_le_add_iff_left (nndist x ↑cx)]
+      apply nndist_triangle (↑cx) (↑cy) y
+    _ ≤ 1 + nndist ↑cx ↑cy + nndist ↑cy y := by
+      simp [add_assoc]
+      apply le_of_lt nndx
+    _ ≤ 1 + nndist ↑cx ↑cy + 1 := by
+      simp [add_assoc]
+      apply le_of_lt nndy
+    _ ≤ nndist cx cy + 2 := by rw [add_comm, ←add_assoc, add_comm]; simp; apply le_of_eq; norm_num
+
+  simp
+  sorry
+
+theorem heine_borel (K : Set ℝ) : IsCompact K ↔ Bornology.IsBounded K ∧ IsClosed K := by
+  constructor
+  . intro cpk
+    exact ⟨isBounded_of_isCompact K cpk, isClosed_of_isCompact K cpk⟩
+  . intro ⟨c, b⟩
+    exact isCompact_of_closed_bounded K b c
