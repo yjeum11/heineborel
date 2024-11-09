@@ -40,11 +40,12 @@ theorem has_finite_subcover_of_partition (P : α → Set ℝ) (C : ι → Set �
     dsimp [T]
     intro x hx
     apply mem_of_subset_of_mem ht at hx
-    simp
+    simp only [toFinite_toFinset, mem_toFinset, mem_iUnion, Finset.mem_coe, exists_prop,
+      iUnion_exists, biUnion_and']
     use a
     constructor
     apply Fintype.complete
-    simp at hx
+    simp only [mem_iUnion, exists_prop] at hx
     apply hx
   use Set.Finite.toFinset T_finite
   simp only [iUnion_subset_iff]
@@ -52,7 +53,7 @@ theorem has_finite_subcover_of_partition (P : α → Set ℝ) (C : ι → Set �
  
 theorem no_finite_subcover_of_partition (P : α → (Set ℝ)) (C : ι → Set ℝ) 
   : NoFiniteSubcover (⋃ i, P i) C → (∃ i, NoFiniteSubcover (P i) C) := by
-  simp [NoFiniteSubcover]
+  simp only [NoFiniteSubcover]
   contrapose!
   apply has_finite_subcover_of_partition
 
@@ -177,7 +178,7 @@ noncomputable def Ts (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) 
 noncomputable def T  (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) (n : ℕ) : Set ℝ := let S := Ts aleb C abnc n; Icc S.low S.high
 
 theorem T0_eq_ab (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : T aleb C abnc 0 = Icc a b := by
-  simp [T, Ts]
+  simp only [T, Ts]
 
 theorem bad_sequence (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ∃ (x : ℕ → ℝ), ∀ i, x i ∈ T aleb C abnc i := by
   have : ∀ i, ∃ x, x ∈ T aleb C abnc i := by
@@ -185,21 +186,21 @@ theorem bad_sequence (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) 
     dsimp [T]
     have := (Ts aleb C abnc i).nempty
     refine nonempty_def.mp ?_
-    simpa
+    simpa only [nonempty_Icc]
   choose f hf using this
   use f
 
 theorem nested : ∀ i, T aleb C abnc (i+1) ⊆ T aleb C abnc i := by
   intro i
-  simp [T] at *
-  simp [Ts]
+  simp only [T] at *
+  simp only [Ts]
   apply (Classical.choose_spec (Ts.proof_9 aleb C abnc i (Ts.proof_8 aleb C abnc i))).2.2.1
 
 theorem T_diam (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) 
   : ∀ i, diam (T aleb C abnc i) = diam (T aleb C abnc 0) * ((1/2)^i) := by
   intro i
   induction' i with i ih
-  . simp
+  . simp only [one_div, pow_zero, mul_one]
   simp [T, Ts]
   simp [T, Ts] at ih
   rw [pow_succ, mul_inv, ←mul_assoc, ←ih]
@@ -222,11 +223,11 @@ theorem T_diam_conv_zero (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b)
 
   have pos : 0 < diam (Icc a b) := by
     have : 0 ≤ diam (Icc a b) := by apply diam_nonneg
-    simp at *
+    simp only [gt_iff_lt, one_div, ge_iff_le] at *
     apply lt_of_le_of_ne this
-    simpa
+    simpa only [ne_eq]
 
-  . simp [T, Ts] at *
+  . simp only [gt_iff_lt, one_div, T, Ts, ge_iff_le] at *
     rw [diam_Icc]
     rw [diam_Icc] at pos
     linarith
@@ -235,18 +236,18 @@ theorem T_diam_conv_zero (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b)
 
   refine (pow_lt_iff_lt_log ?h.a.hx ?h.a.hy).mpr ?h.a.a
   . norm_num
-  . simp [T, Ts]
+  . simp only [T, Ts]
     have pos : 0 < diam (Icc a b) := by
       have : 0 ≤ diam (Icc a b) := by apply diam_nonneg
-      simp at *
+      simp only [gt_iff_lt, one_div, ge_iff_le] at *
       apply lt_of_le_of_ne this
-      simpa
+      simpa only [ne_eq]
     have : 0 < b-a := by rw [←diam_Icc]; apply pos; apply aleb
     rw [diam_Icc]
     apply div_pos <;> linarith
     apply aleb
   rw [←div_lt_iff_of_neg, log_div_log, ←gt_iff_lt]
-  simp at *
+  simp only [gt_iff_lt, one_div, ge_iff_le] at *
   apply Nat.lt_of_floor_lt
   linarith
   apply log_neg <;> norm_num
@@ -255,7 +256,7 @@ theorem T_bounded (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) (i 
   Bornology.IsBounded (T aleb C abnc i) := by
   have ssT0 : (T aleb C abnc i) ⊆ T aleb C abnc 0 := by
     induction' i with i ih
-    . simp
+    . simp only [subset_refl]
     trans (T aleb C abnc i)
     apply nested
     assumption
@@ -263,7 +264,7 @@ theorem T_bounded (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) (i 
   suffices h : Bornology.IsBounded (T aleb C abnc 0)
   exact Bornology.IsBounded.subset h ssT0
 
-  simp [T, Ts]
+  simp only [T, Ts]
   exact isBounded_Icc a b
 
 theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2) (hnest : ∀ n, (Icc (s (n+1)).1 (s (n+1)).2) ⊆ (Icc (s n).1 (s n).2))
@@ -276,19 +277,19 @@ theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2)
     intro n
     specialize hnest n
     specialize hs' n
-    simp [Icc_subset_Icc_iff hs'] at hnest
+    simp only [Icc_subset_Icc_iff hs'] at hnest
     apply hnest
 
   have hnest_left (n : ℕ) (N : ℕ) (h : n ≤ N) : (s n).1 ≤ (s N).1 := by
     induction' N, h using Nat.le_induction with N _ ih
-    . simp
+    . simp only [le_refl]
     trans (s N).1
     apply ih
     apply (hnest' N).1
       
   have hnest_right (n : ℕ) (N : ℕ) (h : n ≤ N) : (s N).2 ≤ (s n).2 := by
     induction' N, h using Nat.le_induction with N _ ih
-    . simp
+    . simp only [le_refl]
     trans (s N).2
     apply (hnest' N).2
     apply ih
@@ -307,13 +308,13 @@ theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2)
       apply hnest_right n k this
   
   use iSup (fun x ↦ (s x).1)
-  simp
+  simp only [mem_iInter, mem_Icc]
   intro n
   constructor
   . apply le_ciSup_of_le
-    simp [BddAbove, upperBounds, Nonempty]
+    simp only [BddAbove, upperBounds, mem_range, forall_exists_index, forall_apply_eq_imp_iff]
     use (s 0).2
-    simp
+    simp only [mem_setOf_eq]
     intro a
     trans (s a).2
     apply hs a
@@ -323,13 +324,13 @@ theorem nested_closed (s : ℕ → ℝ × ℝ) (hs : ∀ n, (s n).1 ≤ (s n).2)
   . apply this
 
 theorem bad_limit (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ∃ x, x ∈ ⋂ i, T aleb C abnc i := by
-  simp [T]
+  simp only [T, mem_iInter, mem_Icc]
   let s (i : ℕ) : ℝ × ℝ := ⟨(Ts aleb C abnc i).low, (Ts aleb C abnc i).high⟩
   have hs : ∀ i, (Ts aleb C abnc i).low ≤ (Ts aleb C abnc i).high := by
     intro i
     apply (Ts aleb C abnc i).nempty
   have := nested_closed s hs (nested aleb)
-  simp at this
+  simp only [mem_iInter, mem_Icc] at this
   exact this
 
 theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (Icc a b) := by
@@ -339,12 +340,12 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
   by_contra! hC
 
   choose x hx using bad_limit aleb C hC
-  simp [IsOpenCover] at oC
+  simp only [IsOpenCover] at oC
   rcases oC with ⟨Copen, Ccover⟩
 
-  simp [isOpen_iff] at Copen
+  simp only [isOpen_iff, gt_iff_lt] at Copen
 
-  simp [mem_iInter] at hx
+  simp only [mem_iInter] at hx
 
   have bad_cover : ∃ i, x ∈ C i := by
     refine mem_iUnion.mp ?_
@@ -374,7 +375,7 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
     rcases this with ⟨n, hn⟩
     use n
     intro p hp
-    simp
+    simp only [mem_ball]
     apply hn p
     apply hp
 
@@ -383,13 +384,13 @@ theorem isCompact_of_closed_interval (a b : ℝ) (aleb : a ≤ b) : IsCompact (I
   have bad_T : T aleb C hC n ⊆ C u := by exact fun ⦃a_1⦄ a ↦ hδ (hn a)
 
   have no : ¬ HasFiniteSubcover (T aleb C hC n) C := by 
-    simp [T]
+    simp only [T]
     apply (Ts aleb C hC n).nfs
 
   have T_sub : HasFiniteSubcover (T aleb C hC n) C := by 
-    simp [HasFiniteSubcover]
+    simp only [HasFiniteSubcover]
     use singleton u
-    simp
+    simp only [Finset.mem_singleton, iUnion_iUnion_eq_left]
     apply bad_T
     
   contradiction
@@ -409,74 +410,74 @@ theorem isCompact_of_ss_isCompact (F K : Set ℝ) (hF : IsClosed F) (hK : IsComp
     constructor
     . intro i
       cases i with
-      | none => simpa [V']
-      | some i => simp [V']; apply hV.1
+      | none => simpa only [isOpen_compl_iff, V']
+      | some i => simp only [V']; apply hV.1
     . intro x _
       by_cases h : x ∈ F
-      . simp
-        simp [IsOpenCover] at hV
+      . simp only [mem_iUnion]
+        simp only [IsOpenCover] at hV
         rcases hV with ⟨_, hV2⟩
         have : ∀ f ∈ F, ∃ i, f ∈ V i := by
           intro f hf
           exact mem_iUnion.mp (hV2 hf)
         rcases this x h with ⟨i, hi⟩
         use some i
-      . simp
+      . simp only [mem_iUnion]
         use none
-        simpa [V']
+        simpa only [mem_compl_iff, V']
 
   rcases hK (Option idx) V' hVK with ⟨t, ht⟩
   have hF : F ⊆ ⋃ i ∈ t, V' i := by exact fun ⦃a⦄ a_1 ↦ ht (hsK a_1)
   -- cases on if t includes Fᶜ
-  simp [HasFiniteSubcover]
+  simp only [HasFiniteSubcover]
   have inj : ∀ a a' : Option idx, ∀ b ∈ id a, b ∈ id a' → a = a' := by
     intro a a' b hb hb'
-    simp at *
+    simp only [id_eq, Option.mem_def] at *
     rw [hb, hb']
   use Finset.filterMap id t inj
-  simp
-  simp [IsOpenCover] at *
+  simp only [Finset.mem_filterMap, id_eq, exists_eq_right]
+  simp only [IsOpenCover, and_imp, id_eq, Option.mem_def] at *
   intro f hf
   specialize hF hf
-  simp at hF
-  simp
+  simp only [mem_iUnion, exists_prop] at hF
+  simp only [mem_iUnion, exists_prop]
   rcases hF with ⟨i, hi⟩
   have : ∃ i', i = some i' := by
     by_contra h
     simp_rw [←Option.ne_none_iff_exists'] at h
-    simp at h
+    simp only [ne_eq, Decidable.not_not] at h
     rw [h] at hi
-    simp [V'] at hi
+    simp only [mem_compl_iff, V'] at hi
     rcases hi with ⟨_, hi2⟩
     contradiction
   rcases this with ⟨i', hi'⟩
   use i'
   constructor
-  . simp [hi', V'] at hi
+  . simp only [hi', V'] at hi
     apply hi.1
-  . simp [hi', V'] at hi
+  . simp only [hi', V'] at hi
     apply hi.2
     
 theorem isCompact_of_closed_bounded (F : Set ℝ) (hF : IsClosed F) (hFb : Bornology.IsBounded F) : IsCompact F := by
   rw [isBounded_iff_subset_closedBall 0] at hFb
-  simp [closedBall_eq_Icc] at hFb
+  simp only [closedBall_eq_Icc, zero_sub, zero_add] at hFb
   rcases hFb with ⟨a, ha⟩
   by_cases h : 0 ≤ a
   . have : IsCompact (Icc (-a) a) := by apply isCompact_of_closed_interval; linarith
     apply isCompact_of_ss_isCompact F (Icc (-a) a) <;> assumption
-  . simp at h
+  . simp only [not_le] at h
     have : Icc (-a) a = ∅ := by 
       simp [Set.eq_empty_iff_forall_not_mem]
       intro x hx
       linarith
-    simp [this] at ha
+    simp only [this, subset_empty_iff] at ha
     rw [ha]
-    simp
+    simp only [isCompact_empty]
 
 theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := by
   by_cases Nh : Kᶜ.Nonempty
   swap
-  . simp [not_nonempty_iff_eq_empty] at Nh
+  . simp only [not_nonempty_iff_eq_empty, compl_empty_iff] at Nh
     rw [Nh]
     exact isClosed_univ
   rw [←isOpen_compl_iff, isOpen_iff]
@@ -487,14 +488,14 @@ theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := b
   let W (q : {x // x ∈ K}) : Set ℝ := ball ↑q ((dist ↑q p) / 2)
 
   have ocW : IsOpenCover K W := by
-    simp [IsOpenCover]
+    simp only [IsOpenCover, Subtype.forall, iUnion_coe_set]
     constructor
     . intro i hi; exact isOpen_ball
-    simp [W]
+    simp only [W]
     intro k hk
-    simp
+    simp only [mem_iUnion, mem_ball, exists_prop]
     use k
-    simp
+    simp only [dist_self, Nat.ofNat_pos, div_pos_iff_of_pos_right, dist_pos, ne_eq]
     constructor
     . assumption
     . aesop
@@ -514,8 +515,9 @@ theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := b
     ext x
     constructor
     . intro hx
-      simp
-      simp [V, W] at hx
+      simp only [mem_empty_iff_false]
+      simp only [iInter_coe_set, iUnion_coe_set, mem_inter_iff, mem_iInter, mem_ball, mem_iUnion,
+        exists_prop, exists_and_right, V, W] at hx
       rcases hx with ⟨hx1, q', ⟨hq1, hq2⟩, hq3⟩
       specialize hx1 q' hq1 hq2
       have := calc dist q' p ≤ dist x q' + dist x p := by exact dist_triangle_left q' p x
@@ -523,14 +525,14 @@ theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := b
       linarith
     . intro f
       exfalso
-      simp at f
+      simp only [mem_empty_iff_false] at f
 
   have : V' ⊆ Kᶜ := by 
     dsimp [IsOpenCover] at ocW
     by_contra h
     rw [not_subset] at h
     rcases h with ⟨x, hx1, hx2⟩
-    simp at hx2
+    simp only [mem_compl_iff, Decidable.not_not] at hx2
     have : x ∉ W' := by
       rw [←Set.disjoint_iff_inter_eq_empty, Set.disjoint_left] at VWdisj
       apply VWdisj at hx1
@@ -544,7 +546,7 @@ theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := b
     suffices : ∀ q ∈ T, p ∈ ball p (dist (↑q) p / 2)
     . exact mem_iInter₂_of_mem this
     intro q hq
-    simp
+    simp only [mem_ball, dist_self, Nat.ofNat_pos, div_pos_iff_of_pos_right, dist_pos, ne_eq]
     have : ↑q ∈ K := by exact Subtype.coe_prop q
     aesop
 
@@ -552,7 +554,7 @@ theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := b
     dsimp [V']
     apply isOpen_biInter_finset 
     intro i _
-    simp [V]
+    simp only [V]
     exact isOpen_ball
 
   rw [isOpen_iff] at opV
@@ -572,14 +574,14 @@ theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBo
   let U (q : {x // x ∈ K}) : Set ℝ := ball q 1
 
   have ocU : IsOpenCover K U := by
-    simp [IsOpenCover]
+    simp only [IsOpenCover, Subtype.forall, iUnion_coe_set]
     constructor
     . intro i hi; exact isOpen_ball
-    simp [U]
+    simp only [U]
     intro k hk
-    simp
+    simp only [mem_iUnion, mem_ball, exists_prop]
     use k
-    simp
+    simp only [dist_self, zero_lt_one, and_true]
     assumption
 
   have hfsU : HasFiniteSubcover K U := by 
@@ -603,44 +605,44 @@ theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBo
   . have : 0 ≤ dist (T.max' nT) (T.min' nT) := by exact dist_nonneg
     trans dist (T.max' nT) (T.min' nT)
     apply this
-    simp
+    simp only [le_add_iff_nonneg_right, Nat.ofNat_nonneg]
 
   intro x hx y hy
   have xmem : ∃ tx ∈ T, x ∈ ball ↑tx 1 := by
     apply hT at hx
     dsimp [U] at hx
-    simp at hx
+    simp only [iUnion_coe_set, mem_iUnion, mem_ball, exists_prop, exists_and_right] at hx
     rcases hx with ⟨cx, hcx1, hcx2⟩
-    simp
+    simp only [mem_ball, Subtype.exists, exists_and_right]
     use cx, hcx1
   have ymem : ∃ ty ∈ T, y ∈ ball ↑ty 1 := by
     apply hT at hy
     dsimp [U] at hy
-    simp at hy
+    simp only [iUnion_coe_set, mem_iUnion, mem_ball, exists_prop, exists_and_right] at hy
     rcases hy with ⟨cy, hcy1, hcy2⟩
-    simp
+    simp only [mem_ball, Subtype.exists, exists_and_right]
     use cy, hcy1
 
   rcases xmem with ⟨cx, hcx1, hcx2⟩
   rcases ymem with ⟨cy, hcy1, hcy2⟩
 
-  simp at *
+  simp only [iUnion_coe_set, mem_ball, ge_iff_le] at *
 
   calc dist x y ≤ dist x ↑cx + dist ↑cx y := by exact dist_triangle x (↑cx) y
     _ ≤ dist x ↑cx + dist ↑cx ↑cy + dist ↑cy y := by 
       rw [add_assoc, add_le_add_iff_left (dist x ↑cx)]
       apply dist_triangle (↑cx) (↑cy) y
     _ ≤ 1 + dist ↑cx ↑cy + dist ↑cy y := by
-      simp [add_assoc]
+      simp only [add_assoc, add_le_add_iff_right]
       apply le_of_lt hcx2
     _ ≤ 1 + dist ↑cx ↑cy + 1 := by
-      simp [add_assoc]
+      simp only [add_assoc, add_le_add_iff_left]
       have := (le_of_lt hcy2)
       rw [dist_comm] at this
       exact this
-    _ ≤ dist cx cy + 2 := by rw [add_comm, ←add_assoc, add_comm]; simp; apply le_of_eq; norm_num
+    _ ≤ dist cx cy + 2 := by rw [add_comm, ←add_assoc, add_comm]; simp only [add_le_add_iff_left]; apply le_of_eq; norm_num
 
-  simp [dist]
+  simp only [dist, add_le_add_iff_right]
 
   have : |↑(T.max' nT) - (↑(T.min' nT) : ℝ)| = (↑(T.max' nT) - ↑(T.min' nT) : ℝ) := by
     rw [abs_eq_self]
@@ -665,7 +667,7 @@ theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBo
     apply Finset.min'_le
     exact hcy1
   . have : |↑cx - (↑cy:ℝ)| = -(↑cx - ↑cy) := by
-      simp at h
+      simp only [Subtype.coe_le_coe, not_le] at h
       apply le_of_lt at h
       rw [abs_eq_neg_self, @sub_nonpos, Subtype.coe_le_coe]
       exact h
