@@ -163,7 +163,7 @@ structure ncIcc (C : ι → Set ℝ) where
   nempty : low ≤ high
   nfs : NoFiniteSubcover (Icc low high) C
 
-set_option pp.proofs true
+-- set_option pp.proofs true
 noncomputable def Ts (C : ι → Set ℝ) (abnc : NoFiniteSubcover (Icc a b) C) : ℕ → @ncIcc ι C
   | 0 => ⟨a, b, aleb, abnc⟩
   | n + 1 => by
@@ -563,7 +563,12 @@ theorem isClosed_of_isCompact (K : Set ℝ) (hK : IsCompact K) : IsClosed K := b
   trans V' <;> assumption
 
 theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBounded K := by
-  rw [isBounded_iff_nndist]
+  by_cases nK : K.Nonempty
+  swap
+  . rw [@not_nonempty_iff_eq_empty] at nK
+    rw [nK]
+    apply Bornology.isBounded_empty
+
   let U (q : {x // x ∈ K}) : Set ℝ := ball q 1
 
   have ocU : IsOpenCover K U := by
@@ -583,10 +588,22 @@ theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBo
 
   rw [HasFiniteSubcover] at hfsU
   rcases hfsU with ⟨T, hT⟩
+  
+  have nT : T.Nonempty := by 
+    rcases nK with ⟨k, hk⟩
+    apply hT at hk
+    rw [mem_iUnion₂] at hk
+    rcases hk with ⟨i, j, _⟩
+    use i
 
-  have nT : T.Nonempty := by sorry
+  rw [isBounded_iff_exists_ge 0]
+  use (dist (T.max' nT) (T.min' nT)) + 2
 
-  use (nndist ↑(T.max' nT) (↑(T.min' nT) : ℝ)) + 2
+  constructor
+  . have : 0 ≤ dist (T.max' nT) (T.min' nT) := by exact dist_nonneg
+    trans dist (T.max' nT) (T.min' nT)
+    apply this
+    simp
 
   intro x hx y hy
   have xmem : ∃ tx ∈ T, x ∈ ball ↑tx 1 := by
@@ -608,24 +625,59 @@ theorem isBounded_of_isCompact (K : Set ℝ) (hK : IsCompact K) : Bornology.IsBo
   rcases ymem with ⟨cy, hcy1, hcy2⟩
 
   simp at *
-  
-  have nndx : nndist x ↑cx < 1 := by exact hcx2
-  have nndy : nndist ↑cy y < 1 := by rw [nndist_comm]; apply hcy2
 
-  calc nndist x y ≤ nndist x ↑cx + nndist ↑cx y := by exact nndist_triangle x (↑cx) y
-    _ ≤ nndist x ↑cx + nndist ↑cx ↑cy + nndist ↑cy y := by 
-      rw [add_assoc, add_le_add_iff_left (nndist x ↑cx)]
-      apply nndist_triangle (↑cx) (↑cy) y
-    _ ≤ 1 + nndist ↑cx ↑cy + nndist ↑cy y := by
+  calc dist x y ≤ dist x ↑cx + dist ↑cx y := by exact dist_triangle x (↑cx) y
+    _ ≤ dist x ↑cx + dist ↑cx ↑cy + dist ↑cy y := by 
+      rw [add_assoc, add_le_add_iff_left (dist x ↑cx)]
+      apply dist_triangle (↑cx) (↑cy) y
+    _ ≤ 1 + dist ↑cx ↑cy + dist ↑cy y := by
       simp [add_assoc]
-      apply le_of_lt nndx
-    _ ≤ 1 + nndist ↑cx ↑cy + 1 := by
+      apply le_of_lt hcx2
+    _ ≤ 1 + dist ↑cx ↑cy + 1 := by
       simp [add_assoc]
-      apply le_of_lt nndy
-    _ ≤ nndist cx cy + 2 := by rw [add_comm, ←add_assoc, add_comm]; simp; apply le_of_eq; norm_num
+      have := (le_of_lt hcy2)
+      rw [dist_comm] at this
+      exact this
+    _ ≤ dist cx cy + 2 := by rw [add_comm, ←add_assoc, add_comm]; simp; apply le_of_eq; norm_num
 
-  simp
-  sorry
+  simp [dist]
+
+  have : |↑(T.max' nT) - (↑(T.min' nT) : ℝ)| = (↑(T.max' nT) - ↑(T.min' nT) : ℝ) := by
+    rw [abs_eq_self]
+    rw [@sub_nonneg]
+    refine Subtype.coe_le_coe.mpr ?_
+    apply Finset.le_max'
+    apply Finset.min'_mem
+
+  rw [this]
+
+  by_cases h : ↑cy  ≤ (↑cx : ℝ)
+  . have : |↑cx - (↑cy:ℝ)| = ↑cx - ↑cy := by
+      rw [abs_eq_self]
+      rw [@sub_nonneg]
+      exact h
+    rw [this]
+    apply sub_le_sub
+    refine Subtype.coe_le_coe.mpr ?_
+    apply Finset.le_max'
+    exact hcx1
+    refine Subtype.coe_le_coe.mpr ?_
+    apply Finset.min'_le
+    exact hcy1
+  . have : |↑cx - (↑cy:ℝ)| = -(↑cx - ↑cy) := by
+      simp at h
+      apply le_of_lt at h
+      rw [abs_eq_neg_self, @sub_nonpos, Subtype.coe_le_coe]
+      exact h
+    rw [this]
+    rw [neg_sub]
+    apply sub_le_sub
+    refine Subtype.coe_le_coe.mpr ?_
+    apply Finset.le_max'
+    exact hcy1
+    refine Subtype.coe_le_coe.mpr ?_
+    apply Finset.min'_le
+    exact hcx1
 
 theorem heine_borel (K : Set ℝ) : IsCompact K ↔ Bornology.IsBounded K ∧ IsClosed K := by
   constructor
